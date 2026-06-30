@@ -43,9 +43,9 @@ Data di download: 18/06/2026
 
 | Componente | Tecnologia |
 |---|---|
-| Pipeline ETL | Prefect (locale) |
-| Database | SQLite — star schema |
-| Visualizzazione | Power BI |
+| Pipeline ETL | Prefect |
+| Database | SQLite (locale) · PostgreSQL / Supabase (cloud) |
+| Visualizzazione | Power BI Desktop |
 | Linguaggio | Python 3.x |
 
 ---
