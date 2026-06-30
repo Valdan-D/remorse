@@ -1,0 +1,6 @@
+jupyter
+pandas
+prefect>=2.0
+psycopg2-binary
+python-dotenv
+sqlalchemy
