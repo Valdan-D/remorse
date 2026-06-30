@@ -5,13 +5,16 @@
 --
 -- Database: PostgreSQL (Supabase)
 -- Fonte dati: Paleobiology Database (PBDB)
+--
+-- Nota: tutti gli identificatori sono in minuscolo per evitare
+-- ambiguita di case-sensitivity in PostgreSQL.
 -- ============================================================
 
-DROP TABLE IF EXISTS FACT_occurrence CASCADE;
-DROP TABLE IF EXISTS DIM_taxon CASCADE;
-DROP TABLE IF EXISTS DIM_location CASCADE;
-DROP TABLE IF EXISTS DIM_time CASCADE;
-DROP TABLE IF EXISTS DIM_collection CASCADE;
+DROP TABLE IF EXISTS fact_occurrence CASCADE;
+DROP TABLE IF EXISTS dim_taxon CASCADE;
+DROP TABLE IF EXISTS dim_location CASCADE;
+DROP TABLE IF EXISTS dim_time CASCADE;
+DROP TABLE IF EXISTS dim_collection CASCADE;
 
 DROP TYPE IF EXISTS dataset_type_enum;
 DROP TYPE IF EXISTS period_group_enum;
@@ -23,39 +26,36 @@ CREATE TYPE dataset_type_enum AS ENUM ('Dinosauria', 'Plantae');
 CREATE TYPE period_group_enum AS ENUM ('Triassic', 'Jurassic', 'Cretaceous');
 
 -- ------------------------------------------------------------
--- DIM_taxon
--- Classificazione tassonomica dell'organismo fossile
+-- dim_taxon
 -- ------------------------------------------------------------
-CREATE TABLE DIM_taxon (
+CREATE TABLE dim_taxon (
     taxon_key     SERIAL PRIMARY KEY,
     accepted_name VARCHAR(255) NOT NULL,
     accepted_rank VARCHAR(50)  NOT NULL,
     phylum        VARCHAR(100) NOT NULL DEFAULT 'Unknown',
     class         VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    "order"       VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    taxon_order   VARCHAR(100) NOT NULL DEFAULT 'Unknown',
     family        VARCHAR(100) NOT NULL DEFAULT 'Unknown',
     genus         VARCHAR(100) NOT NULL DEFAULT 'Unknown',
     dataset_type  dataset_type_enum NOT NULL
 );
 
 -- ------------------------------------------------------------
--- DIM_location
--- Posizione geografica del ritrovamento fossile
+-- dim_location
 -- ------------------------------------------------------------
-CREATE TABLE DIM_location (
-    location_key     SERIAL PRIMARY KEY,
-    lat               NUMERIC(9,6),
-    lng               NUMERIC(9,6),
-    cc                VARCHAR(10),
-    state             VARCHAR(150) NOT NULL DEFAULT 'Unknown',
-    has_valid_coords  BOOLEAN      NOT NULL DEFAULT FALSE
+CREATE TABLE dim_location (
+    location_key      SERIAL PRIMARY KEY,
+    lat                NUMERIC(9,6),
+    lng                NUMERIC(9,6),
+    cc                 VARCHAR(10),
+    state              VARCHAR(150) NOT NULL DEFAULT 'Unknown',
+    has_valid_coords   BOOLEAN      NOT NULL DEFAULT FALSE
 );
 
 -- ------------------------------------------------------------
--- DIM_time
--- Intervallo geologico dell'occorrenza fossile
+-- dim_time
 -- ------------------------------------------------------------
-CREATE TABLE DIM_time (
+CREATE TABLE dim_time (
     time_key        SERIAL PRIMARY KEY,
     early_interval  VARCHAR(100) NOT NULL,
     late_interval   VARCHAR(100) NOT NULL DEFAULT 'Unknown',
@@ -63,26 +63,23 @@ CREATE TABLE DIM_time (
 );
 
 -- ------------------------------------------------------------
--- DIM_collection
--- Sito di scavo e formazione geologica
+-- dim_collection
 -- ------------------------------------------------------------
-CREATE TABLE DIM_collection (
+CREATE TABLE dim_collection (
     collection_no     INT PRIMARY KEY,
     formation         VARCHAR(150) NOT NULL DEFAULT 'Unknown',
     geological_group  VARCHAR(150) NOT NULL DEFAULT 'Unknown'
 );
 
 -- ------------------------------------------------------------
--- FACT_occurrence
--- Tabella dei fatti — una riga per occorrenza fossile
--- Unifica Dinosauria e Plantae tramite dataset_type
+-- fact_occurrence
 -- ------------------------------------------------------------
-CREATE TABLE FACT_occurrence (
+CREATE TABLE fact_occurrence (
     occurrence_no  INT PRIMARY KEY,
-    collection_no  INT NOT NULL REFERENCES DIM_collection(collection_no),
-    taxon_key      INT NOT NULL REFERENCES DIM_taxon(taxon_key),
-    location_key   INT NOT NULL REFERENCES DIM_location(location_key),
-    time_key       INT NOT NULL REFERENCES DIM_time(time_key),
+    collection_no  INT NOT NULL REFERENCES dim_collection(collection_no),
+    taxon_key      INT NOT NULL REFERENCES dim_taxon(taxon_key),
+    location_key   INT NOT NULL REFERENCES dim_location(location_key),
+    time_key       INT NOT NULL REFERENCES dim_time(time_key),
     dataset_type   dataset_type_enum NOT NULL,
     max_ma         NUMERIC(7,2) NOT NULL,
     min_ma         NUMERIC(7,2) NOT NULL,
@@ -90,14 +87,14 @@ CREATE TABLE FACT_occurrence (
 );
 
 -- ------------------------------------------------------------
--- Indici per ottimizzare le query analitiche
+-- Indici
 -- ------------------------------------------------------------
-CREATE INDEX idx_fact_dataset_type  ON FACT_occurrence(dataset_type);
-CREATE INDEX idx_fact_collection    ON FACT_occurrence(collection_no);
-CREATE INDEX idx_fact_taxon         ON FACT_occurrence(taxon_key);
-CREATE INDEX idx_fact_location      ON FACT_occurrence(location_key);
-CREATE INDEX idx_fact_time          ON FACT_occurrence(time_key);
-CREATE INDEX idx_time_period_group  ON DIM_time(period_group);
-CREATE INDEX idx_location_cc        ON DIM_location(cc);
-CREATE INDEX idx_taxon_genus        ON DIM_taxon(genus);
-CREATE INDEX idx_taxon_dataset      ON DIM_taxon(dataset_type);
+CREATE INDEX idx_fact_dataset_type  ON fact_occurrence(dataset_type);
+CREATE INDEX idx_fact_collection    ON fact_occurrence(collection_no);
+CREATE INDEX idx_fact_taxon         ON fact_occurrence(taxon_key);
+CREATE INDEX idx_fact_location      ON fact_occurrence(location_key);
+CREATE INDEX idx_fact_time          ON fact_occurrence(time_key);
+CREATE INDEX idx_time_period_group  ON dim_time(period_group);
+CREATE INDEX idx_location_cc        ON dim_location(cc);
+CREATE INDEX idx_taxon_genus        ON dim_taxon(genus);
+CREATE INDEX idx_taxon_dataset      ON dim_taxon(dataset_type);
