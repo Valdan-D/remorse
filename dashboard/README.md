@@ -1,6 +1,6 @@
 # dashboard/
 
-Dashboard Power BI interattiva connessa al database SQLite del progetto.
+Dashboard Power BI interattiva connessa al database PostgreSQL su Supabase.
 
 ## File
 
@@ -10,9 +10,9 @@ Dashboard Power BI interattiva connessa al database SQLite del progetto.
 
 ## Come aprire la dashboard
 
-1. Assicurarsi che `data/processed/remorse.db` esista (generarlo con `python etl/pipeline.py` se necessario)
+1. Assicurarsi che lo star schema sia caricato e popolato su Supabase (`sql/schema_postgresql.sql` + `python etl/pipeline_postgres.py`, vedi [`etl/README.md`](../etl/README.md))
 2. Aprire `remorse.pbix` con **Power BI Desktop**
-3. La connessione al database avviene tramite **ODBC** — verificare che il driver SQLite ODBC sia installato sul sistema
+3. La connessione avviene tramite il connettore nativo **PostgreSQL** verso il database Supabase — al primo accesso Power BI chiede le credenziali del database (utente/password, non "Anonimo")
 4. Aggiornare i dati se richiesto (tasto "Aggiorna" nella barra multifunzione)
 
 ## Contenuto della dashboard
@@ -29,5 +29,6 @@ La dashboard risponde alle domande analitiche principali del progetto:
 ## Requisiti
 
 - Power BI Desktop (Windows)
-- Driver ODBC per SQLite (`SQLite ODBC Driver` di Christian Werner o equivalente)
-- `data/processed/remorse.db` generato e aggiornato
+- Connettore PostgreSQL nativo di Power BI (incluso in Desktop, nessun driver ODBC da installare)
+- Credenziali del database Supabase (vedi variabile `DATABASE_URL` nel file `.env` in root, non versionato)
+- Star schema caricato su Supabase e popolato tramite `etl/pipeline_postgres.py`

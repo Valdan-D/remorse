@@ -53,7 +53,7 @@ Data di download: 18/06/2026
 ## Processo
 
 ```
-RAW CSV → EDA → DDL → ETL (Prefect) → remorse.db → Power BI
+RAW CSV → EDA → DDL → ETL (Prefect) → Supabase (PostgreSQL) → Power BI
 ```
 
 ### 1. EDA — Esplorazione dei dati
@@ -102,7 +102,7 @@ Trasformazioni principali:
 ### 4. Power BI — Dashboard
 `dashboard/`
 
-Dashboard interattiva connessa a `remorse.db` tramite ODBC. Risponde alle domande analitiche principali con visualizzazioni geografiche, temporali e tassonomiche.
+Dashboard interattiva connessa al database PostgreSQL su Supabase tramite il connettore nativo PostgreSQL. Risponde alle domande analitiche principali con visualizzazioni geografiche, temporali e tassonomiche.
 
 ---
 
