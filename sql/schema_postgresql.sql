@@ -28,26 +28,42 @@ CREATE TYPE period_group_enum AS ENUM ('Triassic', 'Jurassic', 'Cretaceous');
 -- ------------------------------------------------------------
 -- dim_taxon
 -- ------------------------------------------------------------
+-- order_raggruppato: "taxon_order" per Dinosauria; per Plantae, i 15
+--   ordini piu' frequenti restano invariati, il resto va in 'Altro'.
+-- categoria: macro-categoria trofica/tassonomica derivata da
+--   phylum/class/taxon_order/family — classificazione editoriale,
+--   vedi etl/README.md per l'elenco completo delle famiglie usate.
+-- possibile_aviano_residuo: TRUE se taxon_order e' tra gli ordini
+--   aviari noti rimasti classificati come Reptilia invece che come
+--   Aves (residuo del filtro di esclusione a monte). Colonna condivisa
+--   tra il tema ecosistema (per escludere questi record) e il tema
+--   evoluzione (per includerli come segnale di transizione aviaria).
 CREATE TABLE dim_taxon (
-    taxon_key     SERIAL PRIMARY KEY,
-    accepted_name VARCHAR(255) NOT NULL,
-    accepted_rank VARCHAR(50)  NOT NULL,
-    phylum        VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    class         VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    taxon_order   VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    family        VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    genus         VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    dataset_type  dataset_type_enum NOT NULL
+    taxon_key         SERIAL PRIMARY KEY,
+    accepted_name     VARCHAR(255) NOT NULL,
+    accepted_rank     VARCHAR(50)  NOT NULL,
+    phylum            VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    class             VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    taxon_order       VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    order_raggruppato VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    family            VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    genus             VARCHAR(100) NOT NULL DEFAULT 'Unknown',
+    categoria         VARCHAR(50)  NOT NULL DEFAULT 'Altro/Non Classificato',
+    possibile_aviano_residuo BOOLEAN NOT NULL DEFAULT FALSE,
+    dataset_type      dataset_type_enum NOT NULL
 );
 
 -- ------------------------------------------------------------
 -- dim_location
 -- ------------------------------------------------------------
+-- continente: derivato da "cc" (pycountry_convert + mappa manuale
+--   per codici non standard) — vedi etl/README.md.
 CREATE TABLE dim_location (
     location_key      SERIAL PRIMARY KEY,
     lat                NUMERIC(9,6),
     lng                NUMERIC(9,6),
     cc                 VARCHAR(10),
+    continente         VARCHAR(50)  NOT NULL DEFAULT 'Sconosciuto',
     state              VARCHAR(150) NOT NULL DEFAULT 'Unknown',
     has_valid_coords   BOOLEAN      NOT NULL DEFAULT FALSE
 );
@@ -96,5 +112,9 @@ CREATE INDEX idx_fact_location      ON fact_occurrence(location_key);
 CREATE INDEX idx_fact_time          ON fact_occurrence(time_key);
 CREATE INDEX idx_time_period_group  ON dim_time(period_group);
 CREATE INDEX idx_location_cc        ON dim_location(cc);
+CREATE INDEX idx_location_continente ON dim_location(continente);
 CREATE INDEX idx_taxon_genus        ON dim_taxon(genus);
 CREATE INDEX idx_taxon_dataset      ON dim_taxon(dataset_type);
+CREATE INDEX idx_taxon_categoria    ON dim_taxon(categoria);
+CREATE INDEX idx_taxon_order_raggr  ON dim_taxon(order_raggruppato);
+CREATE INDEX idx_taxon_aviano_residuo ON dim_taxon(possibile_aviano_residuo);

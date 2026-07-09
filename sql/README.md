@@ -38,10 +38,23 @@ Il modello è composto da una fact table e quattro dimensioni, condivise tra i d
 | Tabella | Chiave | Contenuto |
 |---|---|---|
 | `FACT_occurrence` | `occurrence_no` | Un record per ritrovamento fossile |
-| `DIM_taxon` | `taxon_key` | Classificazione tassonomica (phylum → genus) |
-| `DIM_location` | `location_key` | Coordinate, paese, regione |
+| `DIM_taxon` | `taxon_key` | Classificazione tassonomica (phylum → genus), più `order_raggruppato` e `categoria` |
+| `DIM_location` | `location_key` | Coordinate, paese, regione, più `continente` |
 | `DIM_time` | `time_key` | Intervallo geologico, period_group |
 | `DIM_collection` | `collection_no` | Sito di scavo, formazione geologica |
+
+### Colonne derivate (classificazioni editoriali)
+
+Oltre ai campi originali PBDB, `DIM_taxon` e `DIM_location` includono colonne calcolate dalla pipeline ETL
+a partire da campi già presenti — non sono dati nativi PBDB, ma classificazioni scelte dal team
+(vedi `notebooks/test/analisi.ipynb` per l'analisi che le ha introdotte):
+
+| Colonna | Tabella | Derivata da | Descrizione |
+|---|---|---|---|
+| `continente` | `DIM_location` | `cc` | Continente (`pycountry_convert` + mappa manuale per codici non standard) |
+| `order_raggruppato` | `DIM_taxon` | `order`/`taxon_order`, `dataset_type` | Uguale a `order` per Dinosauria; per Plantae, i 15 ordini più frequenti restano invariati, il resto è raggruppato in `'Altro'` |
+| `categoria` | `DIM_taxon` | `phylum`, `class`, `order`/`taxon_order`, `family` | Macro-categoria trofica/tassonomica: `'Pianta'`, `'Carnivoro'`, `'Erbivoro'`, `'Erbivoro/Incertezza'`, `'Altro/Non Classificato'` |
+| `possibile_aviano_residuo` | `DIM_taxon` | `order`/`taxon_order` | Booleano: `TRUE` se l'ordine è tra quelli aviari noti rimasti classificati come `Reptilia` invece che come `Aves` (residuo del filtro di esclusione a monte). Colonna condivisa: il tema ecosistema la usa per escludere questi record, il tema evoluzione per includerli come segnale di transizione verso gli uccelli |
 
 ### Differenze tra versioni
 

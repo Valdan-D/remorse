@@ -12,28 +12,49 @@ PRAGMA foreign_keys = ON;
 -- ------------------------------------------------------------
 -- DIM_taxon
 -- Classificazione tassonomica dell'organismo fossile
+--
+-- order_raggruppato: "order" per Dinosauria (pochi ordini distinti);
+--   per Plantae, i 15 ordini piu' frequenti restano invariati, il
+--   resto e' raggruppato in 'Altro' (troppo frammentato altrimenti).
+-- categoria: macro-categoria trofica/tassonomica derivata da
+--   phylum/class/"order"/family ('Pianta', 'Carnivoro', 'Erbivoro',
+--   'Erbivoro/Incertezza', 'Altro/Non Classificato') — classificazione
+--   editoriale basata su famiglie note in letteratura, non un campo
+--   nativo PBDB. Vedi etl/README.md per l'elenco completo.
+-- possibile_aviano_residuo: TRUE se "order" e' tra gli ordini aviari
+--   noti rimasti classificati come Reptilia invece che come Aves
+--   (residuo del filtro di esclusione a monte). Colonna condivisa tra
+--   il tema ecosistema (per escludere questi record) e il tema
+--   evoluzione (per includerli come segnale di transizione aviaria).
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS DIM_taxon (
-    taxon_key    INTEGER PRIMARY KEY AUTOINCREMENT,
-    accepted_name TEXT    NOT NULL,
-    accepted_rank TEXT    NOT NULL,
-    phylum       TEXT    NOT NULL DEFAULT 'Unknown',
-    class        TEXT    NOT NULL DEFAULT 'Unknown',
-    "order"      TEXT    NOT NULL DEFAULT 'Unknown',
-    family       TEXT    NOT NULL DEFAULT 'Unknown',
-    genus        TEXT    NOT NULL DEFAULT 'Unknown',
-    dataset_type TEXT    NOT NULL CHECK (dataset_type IN ('Dinosauria', 'Plantae'))
+    taxon_key         INTEGER PRIMARY KEY AUTOINCREMENT,
+    accepted_name     TEXT    NOT NULL,
+    accepted_rank     TEXT    NOT NULL,
+    phylum            TEXT    NOT NULL DEFAULT 'Unknown',
+    class             TEXT    NOT NULL DEFAULT 'Unknown',
+    "order"           TEXT    NOT NULL DEFAULT 'Unknown',
+    order_raggruppato TEXT    NOT NULL DEFAULT 'Unknown',
+    family            TEXT    NOT NULL DEFAULT 'Unknown',
+    genus             TEXT    NOT NULL DEFAULT 'Unknown',
+    categoria         TEXT    NOT NULL DEFAULT 'Altro/Non Classificato',
+    possibile_aviano_residuo INTEGER NOT NULL DEFAULT 0 CHECK (possibile_aviano_residuo IN (0, 1)),
+    dataset_type      TEXT    NOT NULL CHECK (dataset_type IN ('Dinosauria', 'Plantae'))
 );
 
 -- ------------------------------------------------------------
 -- DIM_location
 -- Posizione geografica del ritrovamento fossile
+--
+-- continente: derivato da "cc" (pycountry_convert + mappa manuale
+--   per codici non standard) — vedi etl/README.md.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS DIM_location (
     location_key     INTEGER PRIMARY KEY AUTOINCREMENT,
     lat              REAL,
     lng              REAL,
     cc               TEXT,
+    continente       TEXT    NOT NULL DEFAULT 'Sconosciuto',
     state            TEXT    NOT NULL DEFAULT 'Unknown',
     has_valid_coords INTEGER NOT NULL DEFAULT 0 CHECK (has_valid_coords IN (0, 1))
 );
@@ -86,5 +107,9 @@ CREATE INDEX IF NOT EXISTS idx_fact_location       ON FACT_occurrence(location_k
 CREATE INDEX IF NOT EXISTS idx_fact_time           ON FACT_occurrence(time_key);
 CREATE INDEX IF NOT EXISTS idx_time_period_group   ON DIM_time(period_group);
 CREATE INDEX IF NOT EXISTS idx_location_cc         ON DIM_location(cc);
+CREATE INDEX IF NOT EXISTS idx_location_continente ON DIM_location(continente);
 CREATE INDEX IF NOT EXISTS idx_taxon_genus         ON DIM_taxon(genus);
 CREATE INDEX IF NOT EXISTS idx_taxon_dataset       ON DIM_taxon(dataset_type);
+CREATE INDEX IF NOT EXISTS idx_taxon_categoria      ON DIM_taxon(categoria);
+CREATE INDEX IF NOT EXISTS idx_taxon_order_raggr    ON DIM_taxon(order_raggruppato);
+CREATE INDEX IF NOT EXISTS idx_taxon_aviano_residuo ON DIM_taxon(possibile_aviano_residuo);

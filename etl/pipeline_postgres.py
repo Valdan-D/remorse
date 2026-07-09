@@ -15,6 +15,7 @@ Richiede la variabile d'ambiente DATABASE_URL, ad esempio in un file .env:
 
 import os
 import pandas as pd
+import pycountry_convert as pc
 from pathlib import Path
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
@@ -32,6 +33,83 @@ DINOS_CSV  = DATA_DIR / 'dinos_clean.csv'
 PLANTS_CSV = DATA_DIR / 'plants_clean.csv'
 
 DATABASE_URL = os.getenv('DATABASE_URL')
+
+# ------------------------------------------------------------
+# Classificazioni editoriali (da notebooks/test/analisi.ipynb, Giada)
+# ------------------------------------------------------------
+MAPPA_CONTINENTE_MANUALE = {
+    'UK': 'EU', 'AQ': 'AN', 'TF': 'AN', 'TL': 'AS', 'PN': 'OC', 'EH': 'AF',
+}
+NOMI_CONTINENTE = {
+    'NA': 'Nord America', 'SA': 'Sud America', 'AS': 'Asia',
+    'AF': 'Africa', 'OC': 'Oceania', 'EU': 'Europa', 'AN': 'Antartide',
+}
+
+FAMIGLIE_CARNIVORE = [
+    'tyrannosauridae', 'dromaeosauridae', 'troodontidae', 'abelisauridae',
+    'spinosauridae', 'megalosauridae', 'carcharodontosauridae', 'caenagnathidae',
+    'ornithomimidae', 'compsognathidae', 'noasauridae', 'therizinosauridae',
+]
+FAMIGLIE_ERBIVORE = [
+    'hadrosauridae', 'ceratopsidae', 'ankylosauridae', 'nodosauridae',
+    'diplodocidae', 'titanosauridae', 'camarasauridae', 'stegosauridae',
+    'iguanodontidae', 'massospondylidae', 'brachiosauridae', 'thescelosauridae',
+    'pachycephalosauridae', 'psittacosauridae', 'protoceratopsidae',
+]
+
+# Ordini chiaramente aviani rimasti classificati come Reptilia invece
+# che come Aves (residuo del filtro di esclusione a monte)
+ORDINI_AVIANI_MASCHERATI = [
+    'Galliformes', 'Hesperornithiformes', 'Ichthyornithes', 'Alexornithiformes',
+    'Colymbiformes', 'Yanornithiformes', 'Cathayornithiformes',
+    'Eoenantiornithiformes', 'Jeholornithiformes',
+]
+
+
+def cc_a_continente(cc: str) -> str:
+    if pd.isna(cc):
+        return 'Sconosciuto'
+    if cc in MAPPA_CONTINENTE_MANUALE:
+        return NOMI_CONTINENTE[MAPPA_CONTINENTE_MANUALE[cc]]
+    try:
+        codice = pc.country_alpha2_to_continent_code(cc)
+        return NOMI_CONTINENTE.get(codice, 'Sconosciuto')
+    except Exception:
+        return 'Sconosciuto'
+
+
+def raggruppa_ordine(row: pd.Series, top_ordini_piante: list) -> str:
+    if row['dataset_type'] == 'Dinosauria':
+        return row['taxon_order']
+    if pd.isna(row['taxon_order']):
+        return row['taxon_order']
+    return row['taxon_order'] if row['taxon_order'] in top_ordini_piante else 'Altro'
+
+
+def assegna_categoria(row: pd.Series) -> str:
+    classe   = str(row.get('class', '')).lower()
+    ordine   = str(row.get('taxon_order', '')).lower()
+    famiglia = str(row.get('family', '')).lower()
+    phylum   = str(row.get('phylum', '')).lower()
+
+    if phylum in ('tracheophyta', 'bryophyta', 'pteridophyta') or 'psilophyta' in phylum or 'coniferophyta' in phylum:
+        return 'Pianta'
+    elif 'magnoliopsida' in classe or 'liliopsida' in classe or 'pinopsida' in classe:
+        return 'Pianta'
+
+    if famiglia in FAMIGLIE_CARNIVORE:
+        return 'Carnivoro'
+    if famiglia in FAMIGLIE_ERBIVORE:
+        return 'Erbivoro'
+
+    if 'theropoda' in ordine or 'theropoda' in classe:
+        return 'Carnivoro'
+    elif 'ornithischia' in classe or 'sauropodomorpha' in ordine or 'sauropoda' in ordine:
+        return 'Erbivoro'
+    elif 'dinosauria' in classe or 'saurischia' in ordine:
+        return 'Erbivoro/Incertezza'
+    else:
+        return 'Altro/Non Classificato'
 
 
 # ------------------------------------------------------------
@@ -89,6 +167,22 @@ def populate_dim_taxon(df: pd.DataFrame, engine) -> pd.DataFrame:
         .drop_duplicates()
         .reset_index(drop=True)
     )
+
+    # Ordini piu' frequenti tra le piante, calcolati a livello di
+    # occorrenza (non di taxon distinto) per restare fedeli a come
+    # sono stati scelti in notebooks/test/analisi.ipynb
+    top_ordini_piante = (
+        df.loc[df['dataset_type'] == 'Plantae', 'taxon_order']
+        .value_counts()
+        .head(15)
+        .index
+        .tolist()
+    )
+
+    dim['order_raggruppato'] = dim.apply(raggruppa_ordine, axis=1, top_ordini_piante=top_ordini_piante)
+    dim['categoria'] = dim.apply(assegna_categoria, axis=1)
+    dim['possibile_aviano_residuo'] = dim['taxon_order'].isin(ORDINI_AVIANI_MASCHERATI)
+
     dim.index.name = 'taxon_key'
     dim = dim.reset_index()
     dim['taxon_key'] += 1
@@ -113,6 +207,7 @@ def populate_dim_location(df: pd.DataFrame, engine) -> pd.DataFrame:
         .drop_duplicates()
         .reset_index(drop=True)
     )
+    dim['continente'] = dim['cc'].apply(cc_a_continente)
     dim.index.name = 'location_key'
     dim = dim.reset_index()
     dim['location_key'] += 1
