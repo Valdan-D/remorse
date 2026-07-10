@@ -13,7 +13,6 @@ Output:
 
 import sqlite3
 import pandas as pd
-import pycountry_convert as pc
 from pathlib import Path
 from prefect import flow, task, get_run_logger
 
@@ -25,85 +24,18 @@ DATA_RAW   = ROOT / 'data' / 'processed'
 DB_PATH    = ROOT / 'data' / 'processed' / 'remorse.db'
 SCHEMA_PATH = ROOT / 'sql' / 'schema.sql'
 
-DINOS_CSV  = DATA_RAW / 'dinos_clean.csv'
-PLANTS_CSV = DATA_RAW / 'plants_clean.csv'
+FOSSILI_CSV = DATA_RAW / 'fossili_clean.csv'
 
-# ------------------------------------------------------------
-# Classificazioni editoriali (da notebooks/test/analisi.ipynb, Giada)
-# ------------------------------------------------------------
-MAPPA_CONTINENTE_MANUALE = {
-    'UK': 'EU', 'AQ': 'AN', 'TF': 'AN', 'TL': 'AS', 'PN': 'OC', 'EH': 'AF',
+# Valori di default per le colonne NOT NULL dello star schema: il CSV
+# esportato dal notebook lascia i tassonomici/geografici mancanti come
+# NaN veri (a differenza della vecchia cleaning_Danilo.ipynb), ma
+# pandas .to_sql() inserisce NULL espliciti che bypassano i DEFAULT SQL.
+VALORI_DEFAULT = {
+    'phylum': 'Unknown', 'class': 'Unknown', 'order': 'Unknown',
+    'order_raggruppato': 'Unknown', 'family': 'Unknown', 'genus': 'Unknown',
+    'state': 'Unknown', 'formation': 'Unknown', 'geological_group': 'Unknown',
+    'late_interval': 'Unknown', 'continente': 'Sconosciuto',
 }
-NOMI_CONTINENTE = {
-    'NA': 'Nord America', 'SA': 'Sud America', 'AS': 'Asia',
-    'AF': 'Africa', 'OC': 'Oceania', 'EU': 'Europa', 'AN': 'Antartide',
-}
-
-FAMIGLIE_CARNIVORE = [
-    'tyrannosauridae', 'dromaeosauridae', 'troodontidae', 'abelisauridae',
-    'spinosauridae', 'megalosauridae', 'carcharodontosauridae', 'caenagnathidae',
-    'ornithomimidae', 'compsognathidae', 'noasauridae', 'therizinosauridae',
-]
-FAMIGLIE_ERBIVORE = [
-    'hadrosauridae', 'ceratopsidae', 'ankylosauridae', 'nodosauridae',
-    'diplodocidae', 'titanosauridae', 'camarasauridae', 'stegosauridae',
-    'iguanodontidae', 'massospondylidae', 'brachiosauridae', 'thescelosauridae',
-    'pachycephalosauridae', 'psittacosauridae', 'protoceratopsidae',
-]
-
-# Ordini chiaramente aviani rimasti classificati come Reptilia invece
-# che come Aves (residuo del filtro di esclusione a monte)
-ORDINI_AVIANI_MASCHERATI = [
-    'Galliformes', 'Hesperornithiformes', 'Ichthyornithes', 'Alexornithiformes',
-    'Colymbiformes', 'Yanornithiformes', 'Cathayornithiformes',
-    'Eoenantiornithiformes', 'Jeholornithiformes',
-]
-
-
-def cc_a_continente(cc: str) -> str:
-    if pd.isna(cc):
-        return 'Sconosciuto'
-    if cc in MAPPA_CONTINENTE_MANUALE:
-        return NOMI_CONTINENTE[MAPPA_CONTINENTE_MANUALE[cc]]
-    try:
-        codice = pc.country_alpha2_to_continent_code(cc)
-        return NOMI_CONTINENTE.get(codice, 'Sconosciuto')
-    except Exception:
-        return 'Sconosciuto'
-
-
-def raggruppa_ordine(row: pd.Series, top_ordini_piante: list) -> str:
-    if row['dataset_type'] == 'Dinosauria':
-        return row['order']
-    if pd.isna(row['order']):
-        return row['order']
-    return row['order'] if row['order'] in top_ordini_piante else 'Altro'
-
-
-def assegna_categoria(row: pd.Series) -> str:
-    classe   = str(row.get('class', '')).lower()
-    ordine   = str(row.get('order', '')).lower()
-    famiglia = str(row.get('family', '')).lower()
-    phylum   = str(row.get('phylum', '')).lower()
-
-    if phylum in ('tracheophyta', 'bryophyta', 'pteridophyta') or 'psilophyta' in phylum or 'coniferophyta' in phylum:
-        return 'Pianta'
-    elif 'magnoliopsida' in classe or 'liliopsida' in classe or 'pinopsida' in classe:
-        return 'Pianta'
-
-    if famiglia in FAMIGLIE_CARNIVORE:
-        return 'Carnivoro'
-    if famiglia in FAMIGLIE_ERBIVORE:
-        return 'Erbivoro'
-
-    if 'theropoda' in ordine or 'theropoda' in classe:
-        return 'Carnivoro'
-    elif 'ornithischia' in classe or 'sauropodomorpha' in ordine or 'sauropoda' in ordine:
-        return 'Erbivoro'
-    elif 'dinosauria' in classe or 'saurischia' in ordine:
-        return 'Erbivoro/Incertezza'
-    else:
-        return 'Altro/Non Classificato'
 
 
 # ------------------------------------------------------------
@@ -113,13 +45,9 @@ def assegna_categoria(row: pd.Series) -> str:
 def load_csv() -> pd.DataFrame:
     logger = get_run_logger()
 
-    dinos  = pd.read_csv(DINOS_CSV,  low_memory=False)
-    plants = pd.read_csv(PLANTS_CSV, low_memory=False)
+    df = pd.read_csv(FOSSILI_CSV, low_memory=False)
+    df = df.fillna(VALORI_DEFAULT)
 
-    df = pd.concat([dinos, plants], ignore_index=True)
-
-    logger.info(f"Dinos:  {len(dinos):,} righe")
-    logger.info(f"Plants: {len(plants):,} righe")
     logger.info(f"Totale: {len(df):,} righe")
 
     return df
@@ -166,28 +94,14 @@ def populate_dim_taxon(df: pd.DataFrame, conn: sqlite3.Connection) -> pd.DataFra
     logger = get_run_logger()
 
     cols = ['accepted_name', 'accepted_rank', 'phylum', 'class',
-            'order', 'family', 'genus', 'dataset_type']
+            'order', 'family', 'genus', 'dataset_type',
+            'order_raggruppato', 'categoria', 'possibile_aviano_residuo']
 
     dim = (
         df[cols]
         .drop_duplicates()
         .reset_index(drop=True)
     )
-
-    # Ordini piu' frequenti tra le piante, calcolati a livello di
-    # occorrenza (non di taxon distinto) per restare fedeli a come
-    # sono stati scelti in notebooks/test/analisi.ipynb
-    top_ordini_piante = (
-        df.loc[df['dataset_type'] == 'Plantae', 'order']
-        .value_counts()
-        .head(15)
-        .index
-        .tolist()
-    )
-
-    dim['order_raggruppato'] = dim.apply(raggruppa_ordine, axis=1, top_ordini_piante=top_ordini_piante)
-    dim['categoria'] = dim.apply(assegna_categoria, axis=1)
-    dim['possibile_aviano_residuo'] = dim['order'].isin(ORDINI_AVIANI_MASCHERATI)
 
     dim.index.name = 'taxon_key'
     dim = dim.reset_index()
@@ -207,14 +121,13 @@ def populate_dim_taxon(df: pd.DataFrame, conn: sqlite3.Connection) -> pd.DataFra
 def populate_dim_location(df: pd.DataFrame, conn: sqlite3.Connection) -> pd.DataFrame:
     logger = get_run_logger()
 
-    cols = ['lat', 'lng', 'cc', 'state', 'has_valid_coords']
+    cols = ['lat', 'lng', 'cc', 'state', 'has_valid_coords', 'continente']
 
     dim = (
         df[cols]
         .drop_duplicates()
         .reset_index(drop=True)
     )
-    dim['continente'] = dim['cc'].apply(cc_a_continente)
     dim.index.name = 'location_key'
     dim = dim.reset_index()
     dim['location_key'] += 1
@@ -266,8 +179,9 @@ def populate_fact(
 
     # Join per ottenere le chiavi surrogate
     taxon_cols    = ['accepted_name', 'accepted_rank', 'phylum', 'class',
-                     'order', 'family', 'genus', 'dataset_type']
-    location_cols = ['lat', 'lng', 'cc', 'state', 'has_valid_coords']
+                     'order', 'family', 'genus', 'dataset_type',
+                     'order_raggruppato', 'categoria', 'possibile_aviano_residuo']
+    location_cols = ['lat', 'lng', 'cc', 'state', 'has_valid_coords', 'continente']
     time_cols     = ['early_interval', 'late_interval', 'period_group']
 
     fact = df.merge(dim_taxon[taxon_cols + ['taxon_key']],

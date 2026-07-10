@@ -23,7 +23,7 @@ DROP TYPE IF EXISTS period_group_enum;
 -- Tipi enumerati
 -- ------------------------------------------------------------
 CREATE TYPE dataset_type_enum AS ENUM ('Dinosauria', 'Plantae');
-CREATE TYPE period_group_enum AS ENUM ('Triassic', 'Jurassic', 'Cretaceous');
+CREATE TYPE period_group_enum AS ENUM ('Triassico', 'Giurassico', 'Cretaceo');
 
 -- ------------------------------------------------------------
 -- dim_taxon

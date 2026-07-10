@@ -29,9 +29,9 @@ WHERE f.dataset_type = 'Dinosauria'
 GROUP BY t.period_group
 ORDER BY
     CASE t.period_group
-        WHEN 'Triassic'   THEN 1
-        WHEN 'Jurassic'   THEN 2
-        WHEN 'Cretaceous' THEN 3
+        WHEN 'Triassico'   THEN 1
+        WHEN 'Giurassico'  THEN 2
+        WHEN 'Cretaceo'    THEN 3
     END;
 
 
@@ -46,7 +46,7 @@ SELECT
 FROM FACT_occurrence f
 JOIN DIM_time t ON t.time_key = f.time_key
 WHERE f.dataset_type = 'Dinosauria'
-  AND t.period_group = 'Cretaceous'
+  AND t.period_group = 'Cretaceo'
 GROUP BY t.early_interval
 ORDER BY eta_media_ma DESC;
 
@@ -109,9 +109,9 @@ WHERE f.dataset_type = 'Dinosauria'
 GROUP BY t.period_group, linea_evolutiva
 ORDER BY
     CASE t.period_group
-        WHEN 'Triassic'   THEN 1
-        WHEN 'Jurassic'   THEN 2
-        WHEN 'Cretaceous' THEN 3
+        WHEN 'Triassico'   THEN 1
+        WHEN 'Giurassico'  THEN 2
+        WHEN 'Cretaceo'    THEN 3
     END,
     linea_evolutiva;
 

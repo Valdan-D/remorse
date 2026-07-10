@@ -70,7 +70,7 @@ CREATE TABLE DIM_time (
     time_key        INT AUTO_INCREMENT PRIMARY KEY,
     early_interval  VARCHAR(100) NOT NULL,
     late_interval   VARCHAR(100) NOT NULL DEFAULT 'Unknown',
-    period_group    ENUM('Triassic', 'Jurassic', 'Cretaceous') NOT NULL
+    period_group    ENUM('Triassico', 'Giurassico', 'Cretaceo') NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------

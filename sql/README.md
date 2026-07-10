@@ -40,14 +40,14 @@ Il modello è composto da una fact table e quattro dimensioni, condivise tra i d
 | `FACT_occurrence` | `occurrence_no` | Un record per ritrovamento fossile |
 | `DIM_taxon` | `taxon_key` | Classificazione tassonomica (phylum → genus), più `order_raggruppato` e `categoria` |
 | `DIM_location` | `location_key` | Coordinate, paese, regione, più `continente` |
-| `DIM_time` | `time_key` | Intervallo geologico, period_group |
+| `DIM_time` | `time_key` | Intervallo geologico, `period_group` (`'Triassico'`/`'Giurassico'`/`'Cretaceo'`) |
 | `DIM_collection` | `collection_no` | Sito di scavo, formazione geologica |
 
 ### Colonne derivate (classificazioni editoriali)
 
-Oltre ai campi originali PBDB, `DIM_taxon` e `DIM_location` includono colonne calcolate dalla pipeline ETL
-a partire da campi già presenti — non sono dati nativi PBDB, ma classificazioni scelte dal team
-(vedi `notebooks/test/analisi.ipynb` per l'analisi che le ha introdotte):
+Oltre ai campi originali PBDB, `DIM_taxon` e `DIM_location` includono colonne calcolate a monte in
+`notebooks/analisi_finale_team.ipynb` (Parte B) e già pronte nel CSV che alimenta le pipeline ETL — non sono
+dati nativi PBDB, ma classificazioni scelte dal team:
 
 | Colonna | Tabella | Derivata da | Descrizione |
 |---|---|---|---|

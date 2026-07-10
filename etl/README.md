@@ -1,6 +1,6 @@
 # etl/
 
-Pipeline ETL orchestrate con **Prefect**. Leggono i CSV puliti da `data/processed/` e popolano il database con lo star schema definito in `sql/`.
+Pipeline ETL orchestrate con **Prefect**. Leggono il CSV pulito da `data/processed/` e popolano il database con lo star schema definito in `sql/`.
 
 ## File
 
@@ -36,7 +36,7 @@ Output: `data/processed/remorse.db`
 Entrambe le pipeline seguono lo stesso flusso Prefect:
 
 ```
-Carica CSV (dinos_clean + plants_clean)
+Carica CSV (fossili_clean.csv)
     ↓
 Crea schema (SQLite) / usa schema esistente (PostgreSQL)
     ↓
@@ -52,19 +52,24 @@ Verifica conteggi tabelle
 
 ## Trasformazioni applicate
 
-Le trasformazioni sono già state eseguite nella fase di cleaning (notebook `cleaning_Danilo.ipynb`). I CSV puliti in ingresso contengono già:
+La pulizia e l'arricchimento tassonomico sono fatti a monte in `notebooks/analisi_finale_team.ipynb`
+(Parte A, base condivisa dal team — sostituisce la vecchia `cleaning_Danilo.ipynb`), che esporta un unico
+CSV: `data/processed/fossili_clean.csv`. Le pipeline non ricalcolano più nulla in Python: leggono le colonne
+già pronte e popolano lo star schema.
 
-- Valori nulli rimossi nelle colonne critiche
-- Duplicati eliminati
-- Colonna `dataset_type` → `'Dinosauria'` | `'Plantae'`
-- Colonna `mid_ma` → `(max_ma + min_ma) / 2`
-- Colonna `period_group` → `'Triassic'` | `'Jurassic'` | `'Cretaceous'`
-- Flag `has_valid_coords` per record con coordinate valide
+Il notebook applica, prima dell'export:
+
+- Valori nulli rimossi nelle colonne critiche, duplicati eliminati
+- Colonna `dataset_type` → `'Dinosauria'` | `'Plantae'` (da `origine_dataset`)
+- Colonna `mid_ma` → `(max_ma + min_ma) / 2` (da `eta_media_ma`)
+- Colonna `period_group` → `'Triassico'` | `'Giurassico'` | `'Cretaceo'` (da `periodo_mesozoico`; le righe
+  `'Altro'` — età fuori dal range Mesozoico 66-252 Ma, ~1.2% del totale — vengono escluse dall'export)
+- Flag `has_valid_coords` per record con coordinate valide (da `coordinate_valide`)
 - Classe `Aves` esclusa dal dataset dinosauri
-- Colonna `order` rinominata `taxon_order` (PostgreSQL: parola riservata)
+- Colonna `order` rinominata `taxon_order` in `pipeline_postgres.py` (PostgreSQL: parola riservata)
 
-Oltre a queste, entrambe le pipeline calcolano tre colonne aggiuntive prima di popolare le dimensioni
-(logica portata da `notebooks/test/analisi.ipynb`, tema "ecosistema" di Giada):
+Oltre a queste, il notebook calcola quattro colonne derivate condivise, già pronte nel CSV (nessuna delle
+due pipeline le ricalcola più — in precedenza erano duplicate in Python in entrambi i file):
 
 - `DIM_location.continente` — da `cc`, tramite `pycountry_convert` più una mappa manuale per codici PBDB
   non standard (`UK`, `AQ`, `TF`, `TL`, `PN`, `EH`)
@@ -80,9 +85,14 @@ Oltre a queste, entrambe le pipeline calcolano tre colonne aggiuntive prima di p
   il tema ecosistema filtra `WHERE NOT possibile_aviano_residuo` per restare sui soli dinosauri "classici",
   il tema evoluzione la usa come uno dei segnali della transizione verso la linea aviaria
 
-Queste tre colonne sono classificazioni editoriali, non campi nativi PBDB — vanno lette come tali quando
-si presentano i risultati. La loro completezza dipende dal livello di riempimento tassonomico dei CSV
-puliti in ingresso: `dinos_clean.csv`/`plants_clean.csv` non includono l'arricchimento tassonomico più
-approfondito fatto in `notebooks/EDA_unito_V0.3.ipynb` (sezione 7, tramite i CSV di supporto in
-`notebooks/scraping/`), quindi `categoria` risulta `'Altro/Non Classificato'` per una quota di record
-superiore rispetto a quanto visto in `analisi.ipynb`, che lavora sul dataframe arricchito.
+Queste quattro colonne sono classificazioni editoriali, non campi nativi PBDB — vanno lette come tali quando
+si presentano i risultati.
+
+Le colonne testuali/tassonomiche che restano `NaN` dopo la pulizia del notebook (`phylum`, `class`, `order`,
+`family`, `genus`, `state`, `formation`, `geological_group`, `late_interval`, `continente`) vengono riempite
+dalle pipeline con i valori di default `'Unknown'` / `'Sconosciuto'` prima dell'inserimento (`VALORI_DEFAULT`
+in entrambi i file), perché `pandas.to_sql()` inserisce `NULL` espliciti che bypassano i `DEFAULT` definiti
+nello schema SQL.
+
+`data/processed/dinos_clean.csv` e `plants_clean.csv` (output storico di `cleaning_Danilo.ipynb`) restano nel
+repo ma non sono più usati da nessuna pipeline.

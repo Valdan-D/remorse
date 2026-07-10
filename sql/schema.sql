@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS DIM_time (
     time_key       INTEGER PRIMARY KEY AUTOINCREMENT,
     early_interval TEXT    NOT NULL,
     late_interval  TEXT    NOT NULL DEFAULT 'Unknown',
-    period_group   TEXT    NOT NULL CHECK (period_group IN ('Triassic', 'Jurassic', 'Cretaceous'))
+    period_group   TEXT    NOT NULL CHECK (period_group IN ('Triassico', 'Giurassico', 'Cretaceo'))
 );
 
 -- ------------------------------------------------------------
